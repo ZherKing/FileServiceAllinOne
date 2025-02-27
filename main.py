@@ -6,6 +6,7 @@ import os
 import ctypes
 import threading
 
+
 class ServiceManager:
     def __init__(self, log_text_widget):
         self.log_text_widget = log_text_widget
@@ -35,18 +36,36 @@ class ServiceManager:
         thread = threading.Thread(target=self.run_command, args=(command,))
         thread.start()
 
+    def check_service_status(self):
+        try:
+            completed_process = subprocess.run(
+                "dism /online /Get-Features /English",
+                check=True,
+                capture_output=True,
+                text=True,
+                shell=True,
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
+            features = completed_process.stdout
+
+            ftp_status = "IIS-FTPServer" in features and "Enabled" in features.split("IIS-FTPServer")[1].split(" ")[2]
+            smb_status = "SMB1Protocol" in features and "Enabled" in features.split("SMB1Protocol")[1].split(" ")[2]
+            nfs_status = "ServicesForNFS-Server" in features and "Enabled" in \
+                         features.split("ServicesForNFS-Server")[1].split(" ")[2]
+
+            self.log(f"FTP服务状态: {'启用' if ftp_status else '禁用'}")
+            self.log(f"SMB服务状态: {'启用' if smb_status else '禁用'}")
+            self.log(f"NFS服务状态: {'启用' if nfs_status else '禁用'}")
+        except subprocess.CalledProcessError as e:
+            self.log(f"检查服务状态失败: {e}")
+            messagebox.showerror("错误", f"检查服务状态失败: {e}")
+
     # FTP部分
     def enable_ftp_feature(self):
         self.log("正在启用IIS和FTP服务功能...")
         self.run_command_threaded("dism /online /enable-feature /featurename:IIS-WebServerRole /all")
         self.run_command_threaded("dism /online /enable-feature /featurename:IIS-FTPServer /all")
         self.log("IIS和FTP服务功能已启用")
-
-    def disable_ftp_feature(self):
-        self.log("正在禁用IIS和FTP服务功能...")
-        self.run_command_threaded("dism /online /disable-feature /featurename:IIS-WebServerRole")
-        self.run_command_threaded("dism /online /disable-feature /featurename:IIS-FTPServer")
-        self.log("IIS和FTP服务功能已禁用")
 
     def start_ftp(self):
         self.log("正在启动FTP服务器...")
@@ -92,25 +111,34 @@ class ServiceManager:
         self.log("NFS 服务器已停止")
         messagebox.showinfo("信息", "NFS 服务已停止")
 
+
 class App:
     def __init__(self, root):
         self.root = root
         self.root.title("FileServiceAllinOne by ZherKing")
 
-        # 创建菜单
-        menubar = tk.Menu(root)
-        helpmenu = tk.Menu(menubar, tearoff=0)
-        helpmenu.add_command(label="关于", command=self.show_about)
-        menubar.add_cascade(label="帮助", menu=helpmenu)
-        root.config(menu=menubar)
-
-        self.title_label = tk.Label(root, text="FileServiceAllinOne", font=("Helvetica", 16))
-        self.title_label.pack(pady=10)
-
         self.log_text = tk.Text(root, height=10, state=tk.NORMAL)
         self.log_text.pack(pady=10)
 
         self.manager = ServiceManager(self.log_text)
+
+        # 创建菜单
+        menubar = tk.Menu(root)
+
+        # 帮助菜单
+        helpmenu = tk.Menu(menubar, tearoff=0)
+        helpmenu.add_command(label="关于", command=self.show_about)
+        menubar.add_cascade(label="帮助", menu=helpmenu)
+
+        # 检查菜单
+        checkmenu = tk.Menu(menubar, tearoff=0)
+        checkmenu.add_command(label="检查服务状态", command=self.manager.check_service_status)
+        menubar.add_cascade(label="检查", menu=checkmenu)
+
+        root.config(menu=menubar)
+
+        self.title_label = tk.Label(root, text="FileServiceAllinOne", font=("Helvetica", 16))
+        self.title_label.pack(pady=10)
 
         # FTP部分
         self.ftp_label = tk.Label(root, text="FTP服务管理", font=("Helvetica", 14))
@@ -118,9 +146,6 @@ class App:
 
         self.enable_ftp_feature_button = tk.Button(root, text="启用FTP服务", command=self.manager.enable_ftp_feature)
         self.enable_ftp_feature_button.pack(pady=5)
-
-        self.disable_ftp_feature_button = tk.Button(root, text="禁用FTP服务", command=self.manager.disable_ftp_feature)
-        self.disable_ftp_feature_button.pack(pady=5)
 
         self.start_iis_button = tk.Button(root, text="启动 IIS", command=self.manager.start_iis)
         self.start_iis_button.pack(pady=5)
@@ -152,13 +177,16 @@ class App:
         self.nfs_stop_button.pack(pady=5)
 
     def show_about(self):
-        messagebox.showinfo("关于", "作者: ZherKing\n版本: 1.0\n日期: 2025-02-24\n\n感谢测试人员：\n@初雨(blog.bronya.space)")
+        messagebox.showinfo("关于",
+                            "作者: ZherKing\n版本: 1.0\n日期: 2025-02-24\n\n感谢测试人员：\n@初雨(blog.bronya.space)")
+
 
 def is_admin():
     try:
         return ctypes.windll.shell32.IsUserAnAdmin()
     except:
         return False
+
 
 if __name__ == "__main__":
     if not is_admin():
