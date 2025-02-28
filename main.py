@@ -12,10 +12,15 @@ import threading
 class ServiceManager:
     def __init__(self, log_text_widget):
         self.log_text_widget = log_text_widget
+        self.log_welcome_message()
 
     def log(self, message):
         self.log_text_widget.insert(tk.END, message + "\n")
         self.log_text_widget.see(tk.END)
+
+    def log_welcome_message(self):
+        welcome_message = "欢迎使用 FileServiceAllinOne! 作者：ZherKing\n项目链接：https://github.com/ZherKing/FileServiceAllinOne"
+        self.log(welcome_message)
 
     def run_command(self, command):
         try:
@@ -117,7 +122,7 @@ class ServiceManager:
 class App:
     def __init__(self, root):
         self.root = root
-        self.root.title("FileServiceAllinOne by ZherKing")
+        self.root.title(f"FileServiceAllinOne {version}")
 
         self.log_text = tk.Text(root, height=10, state=tk.NORMAL, font=("Microsoft YaHei", 10))
         self.log_text.pack(pady=10)
@@ -199,8 +204,8 @@ class App:
         self.root.set_theme(theme)
 
     def show_about(self):
-        messagebox.showinfo("关于",
-                            "作者: ZherKing\n版本: 1.1\n日期: 2025-02-27\n\n感谢测试人员：\n@初雨(blog.bronya.space)")
+        messagebox.showinfo(f"关于",
+                            f"作者: ZherKing\n版本: {version}\n日期: 2025-02-28\n\n感谢测试人员：\n@初雨(blog.bronya.space)")
 
 
 def is_admin():
@@ -211,6 +216,7 @@ def is_admin():
 
 
 if __name__ == "__main__":
+    version = 2.0
     if not is_admin():
         # 重新启动并请求管理员权限
         ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, __file__, None, 1)
